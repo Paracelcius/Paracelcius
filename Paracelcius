@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tilt Car Game</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; background:#333; color:#fff; font-family:sans-serif; }
+    #startButton { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); padding:12px 24px; font-size:1.2em; cursor:pointer; background:#007aff; border:none; border-radius:6px; color:#fff; }
+    #info { position:absolute; top:10px; left:10px; font-size:0.9em; opacity:0.8; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <button id="startButton">Start Game</button>
+  <div id="info">Tilt your phone left/right to steer. Avoid the obstacles!</div>
+  <script>
+    (function () {
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const startButton = document.getElementById('startButton');
+      const info = document.getElementById('info');
+      let width, height;
+      let car = { x: 0, y: 0, width: 50, height: 80 };
+      let obstacles = [];
+      let speed = 4;
+      let tiltX = 0;
+      let gameRunning = false;
+      let score = 0;
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        car.x = width / 2 - car.width / 2;
+        car.y = height - car.height - 20;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function drawRoad() {
+        ctx.fillStyle = '#555';
+        ctx.fillRect(0, 0, width, height);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 4;
+        const laneCount = 2;
+        const laneWidth = width / (laneCount + 1);
+        for (let i = 1; i <= laneCount; i++) {
+          const x = laneWidth * i;
+          ctx.setLineDash([20, 20]);
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      function drawCar() {
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(car.x, car.y, car.width, car.height);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(car.x + 5, car.y + car.height - 10, 10, 10);
+        ctx.fillRect(car.x + car.width - 15, car.y + car.height - 10, 10, 10);
+      }
+
+      function drawObstacles() {
+        ctx.fillStyle = '#f00';
+        obstacles.forEach((obs) => {
+          ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+        });
+      }
+
+      function generateObstacle() {
+        const obsWidth = 40 + Math.random() * 40;
+        const obsX = Math.random() * (width - obsWidth);
+        obstacles.push({ x: obsX, y: -100, width: obsWidth, height: 20 });
+      }
+
+      function updateGame() {
+        car.x += tiltX * 0.3;
+        car.x = Math.max(0, Math.min(width - car.width, car.x));
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+          const obs = obstacles[i];
+          obs.y += speed;
+          if (obs.y + obs.height > car.y && obs.y < car.y + car.height && obs.x + obs.width > car.x && obs.x < car.x + car.width) {
+            endGame();
+            return;
+          }
+          if (obs.y > height) {
+            obstacles.splice(i, 1);
+            score += 1;
+          }
+        }
+        if (Math.random() < 0.02) generateObstacle();
+      }
+
+      function drawScore() {
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px Arial';
+        ctx.fillText('Score: ' + score, 10, 30);
+      }
+
+      function gameLoop() {
+        if (!gameRunning) return;
+        ctx.clearRect(0, 0, width, height);
+        drawRoad();
+        updateGame();
+        drawCar();
+        drawObstacles();
+        drawScore();
+        requestAnimationFrame(gameLoop);
+      }
+
+      function startGame() {
+        score = 0;
+        obstacles = [];
+        car.x = width / 2 - car.width / 2;
+        tiltX = 0;
+        gameRunning = true;
+        startButton.style.display = 'none';
+        info.style.display = 'none';
+        gameLoop();
+      }
+
+      function endGame() {
+        gameRunning = false;
+        startButton.textContent = 'Restart';
+        startButton.style.display = 'block';
+        info.style.display = 'block';
+        info.textContent = 'Game Over! Score: ' + score + ' – Tap to play again.';
+      }
+
+      function handleOrientation(event) {
+        if (event.gamma !== null) {
+          tiltX = event.gamma;
+        }
+      }
+
+      // Request permission for motion/orientation events on iOS
+      function requestDevicePermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientation);
+              startGame();
+            } else {
+              alert('Permission denied. Game cannot run without motion access.');
+            }
+          }).catch(() => {
+            alert('Permission request failed.');
+          });
+        } else if (typeof DeviceMotionEvent !== 'undefined' &&
+                   typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission().then(response => {
+            if (response === 'granted') {
+              window.addEventListener('deviceorientation', handleOrientation);
+              startGame();
+            } else {
+              alert('Permission denied. Game cannot run without motion access.');
+            }
+          }).catch(() => {
+            alert('Permission request failed.');
+          });
+        } else {
+          window.addEventListener('deviceorientation', handleOrientation);
+          startGame();
+        }
+      }
+
+      startButton.addEventListener('click', requestDevicePermission);
+    })();
+  </script>
+</body>
+</html>
